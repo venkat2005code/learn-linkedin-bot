@@ -2,8 +2,8 @@ name: Generate RSS Feed
 
 on:
   schedule:
-    - cron: '0 9 * * *'  # Runs daily at 9 AM UTC
-  workflow_dispatch:       # Allows manual trigger
+    - cron: '0 9 * * *'  # Every day at 9 AM UTC
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,12 +18,12 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install dependencies
+      - name: Install PyRSS2Gen
         run: pip install PyRSS2Gen
 
-      - name: Generate feed.xml
+      - name: Write Python script to file
         run: |
-          python3 <<EOF
+          cat <<EOF > generate_rss.py
 import json
 import datetime
 import PyRSS2Gen
@@ -31,12 +31,12 @@ import PyRSS2Gen
 with open("modules.json", "r") as f:
     modules = json.load(f)
 
-rss_items = []
+items = []
 for module in modules:
-    rss_items.append(PyRSS2Gen.RSSItem(
+    items.append(PyRSS2Gen.RSSItem(
         title=module["title"],
         link=module["url"],
-        description=f"{module['title']} - Microsoft Learn Module",
+        description=module["title"] + " - Microsoft Learn Module",
         pubDate=datetime.datetime.utcnow()
     ))
 
@@ -45,17 +45,20 @@ rss = PyRSS2Gen.RSS2(
     link="https://venkatragavn.github.io/learn-linkedin-bot/feed.xml",
     description="My completed Microsoft Learn modules with Ambassador ID",
     lastBuildDate=datetime.datetime.utcnow(),
-    items=rss_items
+    items=items
 )
 
 with open("feed.xml", "w") as f:
     rss.write_xml(f)
 EOF
 
-      - name: Commit and push feed.xml
+      - name: Run Python script
+        run: python3 generate_rss.py
+
+      - name: Commit feed.xml
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add feed.xml
-          git commit -m "Update RSS feed" || echo "No changes to commit"
+          git commit -m "Update RSS feed" || echo "No changes"
           git push
